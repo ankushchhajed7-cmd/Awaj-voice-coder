@@ -61,6 +61,7 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .msg.ai{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
 .msg.sys{background:none;border:1px dashed var(--line);color:var(--ink-dim);font-size:13px;max-width:100%}
 .msg .replay{display:block;margin-top:7px;font-size:12px;color:var(--violet)}
+.msg .src{margin-top:8px;padding-top:7px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-dim)}
 
 .empty{color:var(--ink-dim);text-align:center;padding:42px 20px;font-size:15px;line-height:1.7}
 .empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:8px}
@@ -201,6 +202,13 @@ nav button.on{color:var(--violet)}
       <option value="0">नहीं</option>
     </select>
 
+    <label for="fSearch">ताज़ा जानकारी (Google Search)</label>
+    <select class="field" id="fSearch">
+      <option value="1">चालू — भाव, news, मौसम live मिलेगा</option>
+      <option value="0">बंद — सिर्फ़ model का knowledge</option>
+    </select>
+    <p class="hint">चालू रखोगे तो जवाब थोड़ा धीरे आएगा पर सही आएगा। Free tier में search की रोज़ की limit होती है।</p>
+
     <label>Quick links</label>
     <div class="row" style="margin-top:0">
       <button class="btn" data-go="https://github.com/ankushchhajed7-cmd">GitHub</button>
@@ -211,7 +219,7 @@ nav button.on{color:var(--violet)}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.01 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+    <p class="hint" style="margin-top:22px">Voice v1.02 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
   </section>
 </main>
 
@@ -251,7 +259,8 @@ const cfg = {
   key:   store.get('key',''),
   model: store.get('model','gemini-3.8-flash'),
   lang:  store.get('lang','hi-IN'),
-  speak: store.get('speak','1')
+  speak: store.get('speak','1'),
+  search:store.get('search','1')
 };
 let files = store.get('files', []);
 let active = 0;
@@ -324,11 +333,12 @@ $('#toSettings').onclick = () => showTab('set');
 
 /* ============ settings ============ */
 $('#fKey').value = cfg.key; $('#fModel').value = cfg.model;
-$('#fLang').value = cfg.lang; $('#fSpeak').value = cfg.speak;
+$('#fLang').value = cfg.lang; $('#fSpeak').value = cfg.speak; $('#fSearch').value = cfg.search;
 $('#fKey').oninput   = e => { cfg.key = e.target.value.trim(); store.set('key', cfg.key); };
 $('#fModel').oninput = e => { cfg.model = e.target.value.trim() || 'gemini-3.8-flash'; store.set('model', cfg.model); };
 $('#fLang').onchange = e => { cfg.lang = e.target.value; store.set('lang', cfg.lang); };
 $('#fSpeak').onchange= e => { cfg.speak = e.target.value; store.set('speak', cfg.speak); };
+$('#fSearch').onchange= e => { cfg.search = e.target.value; store.set('search', cfg.search); };
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => window.open(b.dataset.go,'_blank'));
 $('#btnWipe').onclick = () => { if(confirm('सब कुछ मिट जाएगा — पक्का?')){ store.wipe(); location.reload(); } };
 
@@ -372,11 +382,17 @@ function speak(text){
 if(window.speechSynthesis) speechSynthesis.getVoices();
 
 /* ============ chat ============ */
-function addMsg(who, text){
+function addMsg(who, text, sources){
   $('#chatEmpty').style.display = 'none';
   const d = document.createElement('div');
   d.className = 'msg ' + who;
   d.textContent = text;
+  if(sources && sources.length){
+    const s = document.createElement('div');
+    s.className = 'src';
+    s.textContent = 'स्रोत: ' + sources.join(', ');
+    d.appendChild(s);
+  }
   if(who === 'ai'){
     const b = document.createElement('button');
     b.className = 'replay'; b.textContent = '🔊 फिर सुनो';
@@ -408,28 +424,70 @@ function wantsCode(text){
 }
 
 /* ============ Gemini ============ */
-async function gemini(userText, systemText, wantJson){
-  if(!cfg.key) throw new Error('पहले Settings में API key डालो');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function callOnce(model, userText, systemText, wantJson, useSearch){
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-              encodeURIComponent(cfg.model) + ':generateContent?key=' + encodeURIComponent(cfg.key);
+              encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(cfg.key);
   const body = {
     systemInstruction: { parts: [{ text: systemText }] },
     contents: [{ role:'user', parts:[{ text: userText }] }]
   };
+  // ध्यान: Google Search grounding और JSON mode एक साथ नहीं चलते
   if(wantJson) body.generationConfig = { responseMimeType: 'application/json' };
+  else if(useSearch) body.tools = [{ google_search: {} }];
+
   const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const data = await r.json().catch(() => null);
   if(!r.ok){
-    const m = data && data.error && data.error.message ? data.error.message : ('HTTP ' + r.status);
-    throw new Error(m);
+    const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + r.status);
+    const err = new Error(msg); err.code = r.status; throw err;
   }
   const c = data && data.candidates && data.candidates[0];
   if(!c || !c.content || !c.content.parts) throw new Error('खाली जवाब आया — दोबारा बोलो');
-  return c.content.parts.map(p => p.text || '').join('').trim();
+
+  const text = c.content.parts.map(p => p.text || '').join('').trim();
+  let sources = [];
+  const gm = c.groundingMetadata;
+  if(gm && Array.isArray(gm.groundingChunks)){
+    sources = gm.groundingChunks
+      .map(ch => ch && ch.web && (ch.web.title || ch.web.domain))
+      .filter(Boolean);
+    sources = [...new Set(sources)].slice(0, 3);
+  }
+  return { text, sources };
 }
 
-const CHAT_SYS =
+async function gemini(userText, systemText, wantJson, useSearch){
+  if(!cfg.key) throw new Error('पहले Settings में API key डालो');
+  const chain = [cfg.model];
+  if(cfg.model !== 'gemini-2.5-flash') chain.push('gemini-2.5-flash');
+
+  let last = null;
+  for(const model of chain){
+    for(let tryNo = 0; tryNo < 3; tryNo++){
+      try{
+        return await callOnce(model, userText, systemText, wantJson, useSearch);
+      }catch(err){
+        last = err;
+        const busy = err.code === 503 || err.code === 429 || /high demand|overload|try again/i.test(err.message);
+        if(!busy) throw err;
+        if(tryNo < 2){
+          status('server busy — फिर कोशिश ' + (tryNo+2), 'busy');
+          await sleep(1200 * (tryNo + 1));
+        }
+      }
+    }
+    if(chain.length > 1) status('दूसरे model से कोशिश…', 'busy');
+  }
+  throw new Error('Google का server अभी busy है — थोड़ी देर बाद बोलो');
+}
+
+const CHAT_SYS = () =>
   'तू Voice है — Ankush का voice assistant. Ankush किराना दुकान चलाता है और फ़ोन से HTML PWA tools और MQL5 EA बनाता है. ' +
+  'आज की तारीख़: ' + new Date().toLocaleDateString('hi-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) + '. ' +
+  'भाव, रेट, news, मौसम, score, कोई भी ताज़ा जानकारी पूछी जाए तो Google Search करके असली जवाब दे — कभी मत कहना कि तेरे पास live data नहीं है. ' +
+  'जवाब में तारीख़ या समय बता जब भाव या ख़बर बता रहा हो. ' +
   'जवाब छोटा और सीधा दे, 3-4 लाइन में, क्योंकि जवाब बोलकर सुनाया जाएगा. ' +
   'यूज़र जिस भाषा में बोले उसी में जवाब दे (Hinglish हो तो Hinglish). कोई markdown, कोई bullet, कोई heading नहीं — सिर्फ़ बोलने लायक साफ़ वाक्य.';
 
@@ -466,8 +524,8 @@ async function submit(raw){
           files.map(f => '--- ' + f.name + ' ---\n' + f.code).join('\n\n') +
           '\n\nअब यह बदलाव करो: ' + text + '\n\nपूरी updated files लौटाओ.';
       }
-      const out = await gemini(prompt, CODE_SYS, true);
-      const parsed = parseFiles(out);
+      const res = await gemini(prompt, CODE_SYS, true, false);
+      const parsed = parseFiles(res.text);
       files = parsed.files; active = 0;
       store.set('files', files);
       renderFiles();
@@ -476,11 +534,11 @@ async function submit(raw){
       speak(parsed.note || 'code बन गया');
     } else {
       history.push('यूज़र: ' + text);
-      const out = await gemini(history.slice(-6).join('\n'), CHAT_SYS, false);
-      history.push('तू: ' + out);
-      addMsg('ai', out);
+      const res = await gemini(history.slice(-6).join('\n'), CHAT_SYS(), false, cfg.search === '1');
+      history.push('तू: ' + res.text);
+      addMsg('ai', res.text, res.sources);
       status('तैयार','ok');
-      speak(out);
+      speak(res.text);
     }
   }catch(err){
     status('गड़बड़','err');
