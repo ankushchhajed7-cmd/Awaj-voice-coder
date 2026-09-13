@@ -1,5 +1,5 @@
 /* Voice v1.01 - service worker */
-const CACHE = 'voice-v1-08';
+const CACHE = 'voice-v1-10';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

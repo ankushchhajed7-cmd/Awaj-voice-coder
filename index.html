@@ -258,6 +258,10 @@ nav button.on span{filter:none}
       <b>बोलो कि क्या बनाना है</b>
       "एक कैलकुलेटर app बनाओ"<br>"दुकान के लिए बिल बनाने वाला page बनाओ"<br>"gold का grid EA बनाओ" — .mq5 भी मिलेगा
     </div>
+    <div class="row" id="projRow" style="display:none;margin:0 0 12px">
+      <select class="field" id="projSel" style="flex:1;min-width:0"></select>
+      <button class="btn ghost" id="btnProjDel">हटाओ</button>
+    </div>
     <div id="codeWrap" style="display:none">
       <div class="tabs" id="tabs"></div>
       <textarea class="editor" id="editor" spellcheck="false"></textarea>
@@ -338,9 +342,10 @@ nav button.on span{filter:none}
     </div>
 
     <div class="row" style="margin-top:22px">
-      <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
+      <button class="btn ghost" id="btnClearChat">बातचीत साफ़ करो</button>
+      <button class="btn ghost" id="btnWipe" style="color:var(--rose)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.08 · ANKUSH NEW VISION<br>बोलकर खोलो: WhatsApp, Facebook, Instagram, YouTube, Gmail, Maps, Telegram, Play Store, GitHub, Google, Dialer.</p>
+    <p class="hint" style="margin-top:22px">Voice v1.10 · ANKUSH NEW VISION<br>बोलकर खोलो: WhatsApp, Facebook, Instagram, YouTube, Gmail, Maps, Telegram, Play Store, GitHub, Google, Dialer.</p>
   </section>
 </main>
 
@@ -376,6 +381,9 @@ const store = {
 };
 
 const $ = s => document.querySelector(s);
+let storageOk = true;
+try{ localStorage.setItem('awaaz:__t','1'); localStorage.removeItem('awaaz:__t'); }
+catch(e){ storageOk = false; }
 const cfg = {
   key:   store.get('key',''),
   model: store.get('model','gemini-3.8-flash'),
@@ -386,7 +394,9 @@ const cfg = {
 let files = store.get('files', []);
 let active = 0;
 let notes = store.get('notes', []);
-let history = [];
+let projects = store.get('projects', []);   // पुराने बने हुए projects
+let chat = store.get('chat', []);      // दिखने वाली बातचीत
+let history = store.get('hist', []);   // AI का context
 let pendingFix = false;
 
 function status(text, kind){
@@ -503,7 +513,12 @@ function speak(text){
 if(window.speechSynthesis) speechSynthesis.getVoices();
 
 /* ============ chat ============ */
-function addMsg(who, text, sources){
+function addMsg(who, text, sources, quiet){
+  if(!quiet){
+    chat.push({ who, text, sources: sources || [] });
+    if(chat.length > 60) chat = chat.slice(-60);
+    store.set('chat', chat);
+  }
   $('#chatEmpty').style.display = 'none';
   const d = document.createElement('div');
   d.className = 'msg ' + who;
@@ -736,6 +751,7 @@ async function submit(raw){
       const parsed = parseFiles(res.text);
       files = parsed.files; active = 0;
       store.set('files', files);
+      saveProject(text, parsed.note, files);
       renderFiles();
       $('#codeNote').textContent = parsed.note || '';
       status('तैयार','ok');
@@ -755,6 +771,8 @@ async function submit(raw){
         } else throw err;
       }
       history.push('तू: ' + res.text);
+      if(history.length > 12) history = history.slice(-12);
+      store.set('hist', history);
       addMsg('ai', res.text, res.sources);
       status('तैयार','ok');
       speak(res.text);
@@ -816,6 +834,41 @@ function parseFiles(out){
   return { note:'', files:[{ name:'answer.txt', code: out }] };
 }
 
+/* ============ projects ============ */
+function saveProject(said, note, fileset){
+  const name = ((note || said || 'project').trim().slice(0, 42)) || 'project';
+  projects.unshift({ id: Date.now(), name, ts: Date.now(), files: JSON.parse(JSON.stringify(fileset)) });
+  if(projects.length > 12) projects = projects.slice(0, 12);
+  store.set('projects', projects);
+  renderProjects();
+}
+function renderProjects(){
+  const sel = $('#projSel');
+  if(!projects.length){ $('#projRow').style.display = 'none'; return; }
+  $('#projRow').style.display = 'flex';
+  sel.innerHTML = '';
+  projects.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = new Date(p.ts).toLocaleString('hi-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) + ' · ' + p.name;
+    sel.appendChild(o);
+  });
+}
+$('#projSel').onchange = e => {
+  const p = projects.find(x => String(x.id) === e.target.value);
+  if(!p) return;
+  files = JSON.parse(JSON.stringify(p.files));
+  active = 0; store.set('files', files); renderFiles();
+  status('project खोल दिया','ok');
+};
+$('#btnProjDel').onclick = () => {
+  const id = $('#projSel').value;
+  const p = projects.find(x => String(x.id) === id);
+  if(!p || !confirm('"' + p.name + '" हटा दें?')) return;
+  projects = projects.filter(x => String(x.id) !== id);
+  store.set('projects', projects); renderProjects();
+};
+
 /* ============ code panel ============ */
 function renderFiles(){
   if(!files.length){ $('#codeWrap').style.display='none'; $('#codeEmpty').style.display=''; return; }
@@ -869,7 +922,10 @@ function download(name, code){
 $('#btnDl').onclick    = () => download(files[active].name, $('#editor').value);
 $('#btnDlAll').onclick = () => files.forEach((f,i) => setTimeout(() => download(f.name, f.code), i*450));
 $('#btnFix').onclick   = () => { pendingFix = true; status('बोलो क्या बदलना है','listen'); listen(); };
-$('#btnNew').onclick   = () => { if(confirm('ये project हटा दें?')){ files=[]; store.set('files',[]); renderFiles(); $('#codeNote').textContent=''; } };
+$('#btnNew').onclick   = () => {
+  files = []; store.set('files', []); renderFiles(); $('#codeNote').textContent = '';
+  status('खाली — अब बोलो क्या बनाना है');
+};
 
 /* ============ notes ============ */
 function saveNote(text){
@@ -891,10 +947,20 @@ function renderNotes(){
   });
 }
 $('#btnTest').onclick = testApi;
+$('#btnClearChat').onclick = () => {
+  chat = []; history = [];
+  store.set('chat', []); store.set('hist', []);
+  $('#chatLog').innerHTML = ''; $('#chatEmpty').style.display = '';
+  status('बातचीत साफ़','ok');
+};
 $('#btnNote').onclick = () => { noteMode = true; status('note बोलो','listen'); listen(); };
 
 /* ============ boot ============ */
-renderFiles(); renderNotes();
+chat.forEach(m => addMsg(m.who, m.text, m.sources, true));
+renderFiles(); renderNotes(); renderProjects();
+if(!storageOk){
+  addMsg('sys','⚠ इस browser में data सेव नहीं हो पा रहा। Chrome की site settings में इस साइट के लिए cookies/site data allow करो, वरना app बंद करते ही सब मिट जाएगा।', null, true);
+}
 if(!cfg.key){ showTab('set'); status('API key डालो','err'); }
 </script>
 </body>
