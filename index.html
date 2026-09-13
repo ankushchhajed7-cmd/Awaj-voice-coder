@@ -3,9 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Awaaz — बोलो, बन जाएगा</title>
+<title>Voice</title>
+<meta name="description" content="बोलो, और app बन जाए">
 <meta name="theme-color" content="#14121A">
-<link rel="manifest" href='data:application/manifest+json,{"name":"Awaaz Voice Coder","short_name":"Awaaz","start_url":".","display":"standalone","background_color":"%2314121A","theme_color":"%2314121A","icons":[{"src":"data:image/svg%2Bxml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Crect width=%27192%27 height=%27192%27 rx=%2742%27 fill=%27%237C6BF2%27/%3E%3Ccircle cx=%2796%27 cy=%2778%27 r=%2726%27 fill=%27%23fff%27/%3E%3Crect x=%2788%27 y=%27104%27 width=%2716%27 height=%2734%27 rx=%278%27 fill=%27%23fff%27/%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Voice">
 <style>
 :root{
   --bg:#14121A; --surface:#1D1A26; --surface-2:#262232; --line:#332D45;
@@ -22,17 +28,16 @@ body{
 button,select,input,textarea{font:inherit;color:inherit}
 button{background:none;border:none;cursor:pointer}
 
-/* ---------- top bar ---------- */
 header{
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:8px;
   padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
   border-bottom:1px solid var(--line); background:var(--surface);
 }
-.brand{font-weight:700;letter-spacing:.5px;font-size:18px}
+.brand{font-weight:700;letter-spacing:.5px;font-size:19px}
 .brand em{font-style:normal;color:var(--violet)}
 .status{
   margin-left:auto; font-size:12px; color:var(--ink-dim);
-  display:flex; align-items:center; gap:6px; max-width:46%; text-align:right;
+  display:flex; align-items:center; gap:6px; max-width:44%; text-align:right;
 }
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-dim);flex:none}
 .dot.listen{background:var(--amber);animation:pulse 1s infinite}
@@ -42,8 +47,11 @@ header{
 @keyframes pulse{50%{opacity:.25}}
 .iconbtn{padding:8px;border-radius:10px;color:var(--ink-dim);font-size:19px}
 .iconbtn:active{background:var(--surface-2)}
+#installTop{
+  display:none; padding:7px 13px; border-radius:999px;
+  background:var(--violet); color:#fff; font-size:13px; font-weight:600; flex:none;
+}
 
-/* ---------- panels ---------- */
 main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .panel{display:none;padding:14px 14px 20px}
 .panel.on{display:block}
@@ -57,7 +65,6 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .empty{color:var(--ink-dim);text-align:center;padding:42px 20px;font-size:15px;line-height:1.7}
 .empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:8px}
 
-/* ---------- code panel ---------- */
 .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
 .tab{padding:7px 13px;border-radius:9px;background:var(--surface);border:1px solid var(--line);font-size:13px;font-family:var(--mono);white-space:nowrap;color:var(--ink-dim)}
 .tab.on{background:var(--violet);border-color:var(--violet);color:#fff}
@@ -72,39 +79,36 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .btn.primary{background:var(--violet);border-color:var(--violet);color:#fff;font-weight:600}
 .btn.ghost{background:none}
 
-dialog{
-  border:none;padding:0;background:var(--bg);color:var(--ink);width:100%;height:100%;max-width:100%;max-height:100%;
-}
+dialog{border:none;padding:0;background:var(--bg);color:var(--ink);width:100%;height:100%;max-width:100%;max-height:100%}
 dialog::backdrop{background:#000c}
 .preview-head{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
 #frame{width:100%;height:calc(100% - 58px);border:0;background:#fff}
 
-/* ---------- notes ---------- */
 .note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:10px}
 .note time{display:block;font-size:11px;color:var(--ink-dim);margin-bottom:5px}
 .note button{float:right;color:var(--red);font-size:12px}
 
-/* ---------- settings ---------- */
 label{display:block;font-size:13px;color:var(--ink-dim);margin:14px 0 6px}
 .field{width:100%;padding:11px 12px;background:var(--surface);border:1px solid var(--line);border-radius:11px}
 .hint{font-size:12.5px;color:var(--ink-dim);line-height:1.6;margin-top:8px}
 .hint a{color:var(--violet)}
+.card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--surface);margin-top:6px}
+.card h3{margin:0 0 6px;font-size:15px}
+.card p{margin:0;font-size:13px;color:var(--ink-dim);line-height:1.6}
+.card ol{margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--ink-dim);line-height:1.8}
 
-/* ---------- mic dock ---------- */
 .dock{
   border-top:1px solid var(--line);background:var(--surface);
   padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
   display:flex;align-items:center;gap:10px;
 }
-#say{
-  flex:1;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line);border-radius:22px;
-}
+#say{flex:1;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line);border-radius:22px}
 .mic{
   width:56px;height:56px;flex:none;border-radius:50%;background:var(--violet);color:#fff;font-size:23px;
   display:grid;place-items:center;box-shadow:0 4px 16px #7c6bf240;
 }
-.mic.live{background:var(--amber);box-shadow:0 0 0 0 #e8a33d88;animation:ring 1.2s infinite}
-@keyframes ring{70%{box-shadow:0 0 0 16px #e8a33d00}100%{box-shadow:0 0 0 0 #e8a33d00}}
+.mic.live{background:var(--amber);animation:ring 1.2s infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 #e8a33d88}70%{box-shadow:0 0 0 16px #e8a33d00}100%{box-shadow:0 0 0 0 #e8a33d00}}
 
 nav{display:flex;border-top:1px solid var(--line);background:var(--surface)}
 nav button{flex:1;padding:11px 0 calc(env(safe-area-inset-bottom) + 11px);font-size:12px;color:var(--ink-dim)}
@@ -115,7 +119,8 @@ nav button.on{color:var(--violet)}
 <body>
 
 <header>
-  <div class="brand">आवा<em>ज़</em></div>
+  <div class="brand">Voi<em>ce</em></div>
+  <button id="installTop">Install</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stat">तैयार</span></div>
   <button class="iconbtn" id="toSettings" title="Settings">⚙</button>
 </header>
@@ -163,6 +168,18 @@ nav button.on{color:var(--violet)}
 
   <!-- SETTINGS -->
   <section class="panel" id="p-set">
+
+    <div class="card" id="installCard">
+      <h3 id="installTitle">फ़ोन में install करो</h3>
+      <p id="installText">होम स्क्रीन पर icon आ जाएगा, app की तरह खुलेगा — browser का address bar नहीं दिखेगा।</p>
+      <div class="row"><button class="btn primary" id="installBtn">Install करो</button></div>
+      <ol id="installSteps" style="display:none">
+        <li>Chrome का menu (⋮) दबाओ</li>
+        <li>"Add to Home screen" या "Install app" चुनो</li>
+        <li>नाम <b>Voice</b> रहने दो, Add दबाओ</li>
+      </ol>
+    </div>
+
     <label for="fKey">Gemini API key</label>
     <input class="field" id="fKey" type="password" placeholder="AIza...">
     <p class="hint">Free key यहाँ से बनाओ: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — key सिर्फ़ इसी फ़ोन में रहती है, कहीं नहीं जाती।</p>
@@ -194,7 +211,7 @@ nav button.on{color:var(--violet)}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Awaaz v1.00 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+    <p class="hint" style="margin-top:22px">Voice v1.01 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
   </section>
 </main>
 
@@ -220,7 +237,7 @@ nav button.on{color:var(--violet)}
 </dialog>
 
 <script>
-/* ============ storage (localStorage, memory fallback) ============ */
+/* ============ storage ============ */
 const mem = {};
 const store = {
   get(k, d){ try{ const v = localStorage.getItem('awaaz:'+k); return v===null ? (k in mem ? mem[k] : d) : JSON.parse(v); }
@@ -236,31 +253,76 @@ const cfg = {
   lang:  store.get('lang','hi-IN'),
   speak: store.get('speak','1')
 };
-let files = store.get('files', []);      // [{name, code}]
+let files = store.get('files', []);
 let active = 0;
 let notes = store.get('notes', []);
-let history = [];                         // chat turns for context
+let history = [];
 let pendingFix = false;
 
-/* ============ status ============ */
 function status(text, kind){
   $('#stat').textContent = text;
   $('#dot').className = 'dot' + (kind ? ' '+kind : '');
 }
 
-/* ============ tabs ============ */
-document.querySelectorAll('nav button').forEach(b=>{
-  b.onclick = () => showTab(b.dataset.tab);
+/* ============ install (PWA) ============ */
+let deferred = null;
+const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferred = e;
+  $('#installTop').style.display = 'block';
+  $('#installBtn').style.display = '';
+  $('#installSteps').style.display = 'none';
 });
+
+async function doInstall(){
+  if(deferred){
+    deferred.prompt();
+    const res = await deferred.userChoice.catch(() => null);
+    deferred = null;
+    $('#installTop').style.display = 'none';
+    if(res && res.outcome === 'accepted') markInstalled();
+    return;
+  }
+  // prompt नहीं मिला — हाथ से करने के steps दिखा दो
+  $('#installBtn').style.display = 'none';
+  $('#installSteps').style.display = '';
+  showTab('set');
+  $('#installCard').scrollIntoView({behavior:'smooth', block:'center'});
+}
+$('#installBtn').onclick = doInstall;
+$('#installTop').onclick = doInstall;
+
+function markInstalled(){
+  $('#installTop').style.display = 'none';
+  $('#installTitle').textContent = 'Install हो चुका है';
+  $('#installText').textContent = 'होम स्क्रीन पर Voice का icon मौजूद है।';
+  $('#installBtn').style.display = 'none';
+  $('#installSteps').style.display = 'none';
+}
+window.addEventListener('appinstalled', markInstalled);
+if(standalone) markInstalled();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      $('#installText').textContent = 'Install तभी होगा जब साइट https पर हो (GitHub Pages पर हो जाती है)।';
+    });
+  });
+}
+
+/* ============ tabs ============ */
+document.querySelectorAll('nav button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
 function showTab(name){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
   $('#p-'+name).classList.add('on');
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab===name));
   window.scrollTo(0,0);
 }
 $('#toSettings').onclick = () => showTab('set');
 
-/* ============ settings wiring ============ */
+/* ============ settings ============ */
 $('#fKey').value = cfg.key; $('#fModel').value = cfg.model;
 $('#fLang').value = cfg.lang; $('#fSpeak').value = cfg.speak;
 $('#fKey').oninput   = e => { cfg.key = e.target.value.trim(); store.set('key', cfg.key); };
@@ -309,7 +371,7 @@ function speak(text){
 }
 if(window.speechSynthesis) speechSynthesis.getVoices();
 
-/* ============ chat log ============ */
+/* ============ chat ============ */
 function addMsg(who, text){
   $('#chatEmpty').style.display = 'none';
   const d = document.createElement('div');
@@ -325,35 +387,29 @@ function addMsg(who, text){
   d.scrollIntoView({block:'end'});
 }
 
-/* ============ local shortcuts (no API needed) ============ */
+/* ============ shortcuts ============ */
 const shortcuts = [
-  { re:/(whats\s?app|व्हाट्स|वाट्स)/i,           url:'https://wa.me/',                              say:'WhatsApp खोल रहा हूँ' },
-  { re:/(github|गिटहब|गिट हब)/i,                 url:'https://github.com/ankushchhajed7-cmd',       say:'GitHub खोल रहा हूँ' },
-  { re:/(youtube|यूट्यूब|यू ट्यूब)/i,            url:'https://youtube.com/',                        say:'YouTube खोल रहा हूँ' },
-  { re:/(google\s?maps|नक्शा|मैप)/i,             url:'https://maps.google.com/',                    say:'Maps खोल रहा हूँ' },
-  { re:/(api\s?key|ए पी आई)/i,                   url:'https://aistudio.google.com/apikey',          say:'API key page खोल रहा हूँ' }
+  { re:/(whats\s?app|व्हाट्स|वाट्स)/i,  url:'https://wa.me/',                        say:'WhatsApp खोल रहा हूँ' },
+  { re:/(github|गिटहब|गिट हब)/i,        url:'https://github.com/ankushchhajed7-cmd', say:'GitHub खोल रहा हूँ' },
+  { re:/(youtube|यूट्यूब|यू ट्यूब)/i,   url:'https://youtube.com/',                  say:'YouTube खोल रहा हूँ' },
+  { re:/(google\s?maps|नक्शा|मैप)/i,    url:'https://maps.google.com/',              say:'Maps खोल रहा हूँ' },
+  { re:/(api\s?key|ए पी आई)/i,          url:'https://aistudio.google.com/apikey',    say:'API key page खोल रहा हूँ' }
 ];
 function tryShortcut(text){
   if(!/(खोल|open|चालू|चला)/i.test(text)) return false;
   for(const s of shortcuts){
-    if(s.re.test(text)){
-      addMsg('sys', s.say);
-      speak(s.say);
-      window.open(s.url, '_blank');
-      return true;
-    }
+    if(s.re.test(text)){ addMsg('sys', s.say); speak(s.say); window.open(s.url,'_blank'); return true; }
   }
   return false;
 }
 
-/* ============ is this a build request? ============ */
 function wantsCode(text){
   return /(बनाओ|बना दो|बनादो|बना देना|code|कोड|app|ऐप|page|पेज|script|website|वेबसाइट|ea|mq5|tool|calculator)/i.test(text);
 }
 
 /* ============ Gemini ============ */
 async function gemini(userText, systemText, wantJson){
-  if(!cfg.key){ throw new Error('पहले Settings में API key डालो'); }
+  if(!cfg.key) throw new Error('पहले Settings में API key डालो');
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
               encodeURIComponent(cfg.model) + ':generateContent?key=' + encodeURIComponent(cfg.key);
   const body = {
@@ -361,9 +417,7 @@ async function gemini(userText, systemText, wantJson){
     contents: [{ role:'user', parts:[{ text: userText }] }]
   };
   if(wantJson) body.generationConfig = { responseMimeType: 'application/json' };
-  const r = await fetch(url, {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-  });
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const data = await r.json().catch(() => null);
   if(!r.ok){
     const m = data && data.error && data.error.message ? data.error.message : ('HTTP ' + r.status);
@@ -375,13 +429,13 @@ async function gemini(userText, systemText, wantJson){
 }
 
 const CHAT_SYS =
-  'तू Awaaz है — Ankush का voice assistant. Ankush किराना दुकान चलाता है और फ़ोन से HTML PWA tools और MQL5 EA बनाता है. ' +
+  'तू Voice है — Ankush का voice assistant. Ankush किराना दुकान चलाता है और फ़ोन से HTML PWA tools और MQL5 EA बनाता है. ' +
   'जवाब छोटा और सीधा दे, 3-4 लाइन में, क्योंकि जवाब बोलकर सुनाया जाएगा. ' +
   'यूज़र जिस भाषा में बोले उसी में जवाब दे (Hinglish हो तो Hinglish). कोई markdown, कोई bullet, कोई heading नहीं — सिर्फ़ बोलने लायक साफ़ वाक्य.';
 
 const CODE_SYS =
   'तू एक expert developer है जो Ankush के लिए code लिखता है. वो सिर्फ़ Android फ़ोन से काम करता है, GitHub web editor से, और GitHub Pages पर deploy करता है. ' +
-  'नियम: (1) पूरा चलने लायक code दे, कोई TODO या "यहाँ अपना code डालो" नहीं. ' +
+  'नियम: (1) पूरा चलने लायक code दे, कोई TODO नहीं. ' +
   '(2) डिफ़ॉल्ट रूप से single-file HTML बना — CSS और JS उसी index.html के अंदर — जब तक यूज़र अलग files न माँगे. ' +
   '(3) Mobile-first design, बड़े बटन, dark theme, कोई external CDN नहीं. ' +
   '(4) MQL5 माँगे तो एक ही .mq5 file दे. ' +
@@ -422,8 +476,7 @@ async function submit(raw){
       speak(parsed.note || 'code बन गया');
     } else {
       history.push('यूज़र: ' + text);
-      const ctx = history.slice(-6).join('\n');
-      const out = await gemini(ctx, CHAT_SYS, false);
+      const out = await gemini(history.slice(-6).join('\n'), CHAT_SYS, false);
       history.push('तू: ' + out);
       addMsg('ai', out);
       status('तैयार','ok');
@@ -436,7 +489,7 @@ async function submit(raw){
   }
 }
 
-/* ============ parse model output into files ============ */
+/* ============ parse ============ */
 function parseFiles(out){
   let t = out.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
   try{
@@ -445,7 +498,6 @@ function parseFiles(out){
       return { note: j.note || '', files: j.files.filter(f => f && f.name && f.code) };
     }
   }catch(e){}
-  // fallback: fenced blocks
   const blocks = [...out.matchAll(/```([a-z0-9]*)\n([\s\S]*?)```/gi)];
   if(blocks.length){
     return { note:'', files: blocks.map((b,i) => ({
@@ -459,7 +511,7 @@ function parseFiles(out){
   return { note:'', files:[{ name:'answer.txt', code: out }] };
 }
 
-/* ============ code panel render ============ */
+/* ============ code panel ============ */
 function renderFiles(){
   if(!files.length){ $('#codeWrap').style.display='none'; $('#codeEmpty').style.display=''; return; }
   $('#codeEmpty').style.display='none'; $('#codeWrap').style.display='';
@@ -475,7 +527,6 @@ function renderFiles(){
 }
 $('#editor').oninput = () => { if(files[active]){ files[active].code = $('#editor').value; store.set('files', files); } };
 
-/* ============ preview ============ */
 function buildPreview(){
   let html = (files.find(f => /\.html?$/i.test(f.name)) || files[0]).code;
   files.forEach(f => {
@@ -500,7 +551,6 @@ $('#btnReload').onclick = () => { $('#frame').srcdoc = buildPreview(); };
 $('#btnClose').onclick  = () => { $('#frame').srcdoc = ''; $('#dlg').close(); };
 $('#dlg').addEventListener('close', () => { $('#frame').srcdoc = ''; });
 
-/* ============ copy / download ============ */
 $('#btnCopy').onclick = async () => {
   try{ await navigator.clipboard.writeText($('#editor').value); status('copy हो गया','ok'); }
   catch(e){ $('#editor').select(); document.execCommand('copy'); status('copy हो गया','ok'); }
@@ -530,8 +580,7 @@ function renderNotes(){
     const d = document.createElement('div'); d.className = 'note';
     const del = document.createElement('button'); del.textContent = 'हटाओ';
     del.onclick = () => { notes.splice(i,1); store.set('notes', notes); renderNotes(); };
-    const t = document.createElement('time');
-    t.textContent = new Date(n.t).toLocaleString('hi-IN');
+    const t = document.createElement('time'); t.textContent = new Date(n.t).toLocaleString('hi-IN');
     const p = document.createElement('div'); p.textContent = n.text;
     d.append(del, t, p); w.appendChild(d);
   });
