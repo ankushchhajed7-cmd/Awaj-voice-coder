@@ -340,7 +340,7 @@ nav button.on span{filter:none}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.07 · ANKUSH NEW VISION<br>बोलकर खोलो: WhatsApp, Facebook, Instagram, YouTube, Gmail, Maps, Telegram, Play Store, GitHub, Google, Dialer.</p>
+    <p class="hint" style="margin-top:22px">Voice v1.08 · ANKUSH NEW VISION<br>बोलकर खोलो: WhatsApp, Facebook, Instagram, YouTube, Gmail, Maps, Telegram, Play Store, GitHub, Google, Dialer.</p>
   </section>
 </main>
 
@@ -591,7 +591,7 @@ async function callOnce(model, userText, systemText, wantJson, useSearch){
     contents: [{ role:'user', parts:[{ text: userText }] }]
   };
   // ध्यान: Google Search grounding और JSON mode एक साथ नहीं चलते
-  if(wantJson) body.generationConfig = { responseMimeType: 'application/json' };
+  if(wantJson) body.generationConfig = { responseMimeType: 'application/json', maxOutputTokens: 32768 };
   else if(useSearch) body.tools = [{ google_search: {} }];
 
   const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -767,6 +767,29 @@ async function submit(raw){
 }
 
 /* ============ parse ============ */
+function unesc(t){
+  try{ return JSON.parse('"' + t + '"'); }
+  catch(e){ return t.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\r/g,'')
+                    .replace(/\\"/g,'"').replace(/\\\\/g,'\\'); }
+}
+
+// जवाब बीच में कट जाए तो भी code निकाल लो
+function salvage(raw){
+  const files = [];
+  const full = /"name"\s*:\s*"([^"]+)"\s*,\s*"code"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while((m = full.exec(raw))) files.push({ name: m[1], code: unesc(m[2]) });
+
+  const cut = /"name"\s*:\s*"([^"]+)"\s*,\s*"code"\s*:\s*"((?:[^"\\]|\\.)*)$/.exec(raw);
+  if(cut && !files.some(f => f.name === cut[1])){
+    files.push({ name: cut[1], code: unesc(cut[2]), cut: true });
+  }
+  let note = '';
+  const n = /"note"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
+  if(n) note = unesc(n[1]);
+  return { note, files };
+}
+
 function parseFiles(out){
   let t = out.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
   try{
@@ -784,6 +807,11 @@ function parseFiles(out){
           : (blocks.length===1 ? 'index.html' : 'file'+(i+1)+'.txt'),
       code: b[2].trim()
     })) };
+  }
+  const sv = salvage(out);
+  if(sv.files.length){
+    if(sv.files.some(f => f.cut)) sv.note = (sv.note ? sv.note + ' ' : '') + '⚠ जवाब बीच में कट गया — "इसमें बदलाव बोलो" दबाकर कहो "बाक़ी पूरा करो".';
+    return sv;
   }
   return { note:'', files:[{ name:'answer.txt', code: out }] };
 }
@@ -805,7 +833,7 @@ function renderFiles(){
 $('#editor').oninput = () => { if(files[active]){ files[active].code = $('#editor').value; store.set('files', files); } };
 
 function buildPreview(){
-  let html = (files.find(f => /\.html?$/i.test(f.name)) || files[0]).code;
+  let html = (files.find(f => /\.html?$/i.test(f.name)) || files[active] || files[0]).code;
   files.forEach(f => {
     if(/\.css$/i.test(f.name)){
       const re = new RegExp('<link[^>]*href=["\\\']\\.?/?' + f.name.replace('.','\\.') + '["\\\'][^>]*>', 'i');
