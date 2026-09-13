@@ -305,6 +305,11 @@ nav button.on span{filter:none}
     <input class="field" id="fModel" placeholder="gemini-3.8-flash">
     <p class="hint">खाली छोड़ दो तो अपने आप चलने वाला model पकड़ लेगा। हाथ से डालना हो तो: <span style="font-family:var(--mono)">gemini-3.6-flash</span> या <span style="font-family:var(--mono)">gemini-3.8-flash</span>।</p>
 
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="btnTest">Model की जाँच करो</button>
+    </div>
+    <pre id="testOut" class="hint" style="white-space:pre-wrap;font-family:var(--mono);font-size:11.5px;margin-top:10px"></pre>
+
     <label for="fLang">बोलने की भाषा</label>
     <select class="field" id="fLang">
       <option value="hi-IN">हिंदी</option>
@@ -335,7 +340,7 @@ nav button.on span{filter:none}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.04 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+    <p class="hint" style="margin-top:22px">Voice v1.05 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
   </section>
 </main>
 
@@ -577,8 +582,11 @@ async function callOnce(model, userText, systemText, wantJson, useSearch){
 const FALLBACKS = ['gemini-3.6-flash', 'gemini-3.8-flash'];
 
 function isBusy(err){
-  return err.code === 503 || err.code === 429 ||
+  return err.code === 503 ||
          /high demand|overload|unavailable right now|try again later/i.test(err.message);
+}
+function isQuota(err){
+  return err.code === 429 || /quota|rate limit|resource.?exhausted/i.test(err.message);
 }
 function isBadModel(err){
   return err.code === 404 ||
@@ -604,7 +612,8 @@ async function gemini(userText, systemText, wantJson, useSearch){
       }catch(err){
         last = err;
         if(isBadModel(err)) break;          // ये model है ही नहीं — अगला आज़माओ
-        if(!isBusy(err)) throw err;         // असली गड़बड़ी (key, limit) — सीधे बताओ
+        if(isQuota(err)) break;             // इस model की limit ख़त्म — अगला आज़माओ
+        if(!isBusy(err)) throw err;         // असली गड़बड़ी (key वग़ैरह) — सीधे बताओ
         if(tryNo < 2){
           status('busy — फिर कोशिश ' + (tryNo + 2), 'busy');
           await sleep(1200 * (tryNo + 1));
@@ -614,8 +623,36 @@ async function gemini(userText, systemText, wantJson, useSearch){
     if(mi < chain.length - 1) status(chain[mi+1] + ' से कोशिश…', 'busy');
   }
 
-  if(last && isBadModel(last)) throw new Error('कोई model नहीं मिला। Settings में model का नाम बदलकर देखो — ' + FALLBACKS.join(' या '));
-  throw new Error('Google का server अभी busy है — थोड़ी देर बाद बोलो');
+  if(last && isQuota(last))
+    throw new Error('आज की free limit ख़त्म लग रही है। थोड़ी देर बाद, या Settings में "ताज़ा जानकारी" बंद करके देखो.\n\nGoogle: ' + last.message);
+  if(last && isBadModel(last))
+    throw new Error('कोई model नहीं मिला। Settings में नाम बदलकर देखो.\n\nGoogle: ' + last.message);
+  throw new Error('तीनों model ने मना किया.\n\nGoogle: ' + (last ? last.message : 'कोई जानकारी नहीं'));
+}
+
+/* ---- Settings का test बटन ---- */
+async function testApi(){
+  const out = $('#testOut');
+  if(!cfg.key){ out.textContent = 'पहले API key डालो।'; return; }
+  out.textContent = 'जाँच रहा हूँ…';
+  const chain = [cfg.model, ...FALLBACKS].filter((m,i,a) => m && a.indexOf(m) === i);
+  const lines = [];
+  for(const m of chain){
+    try{
+      await callOnce(m, 'ok bolo', 'सिर्फ़ "ok" लिखकर जवाब दे.', false, false);
+      lines.push('✅ ' + m + ' — चल रहा है');
+    }catch(e){
+      lines.push('❌ ' + m + ' — ' + (e.code ? e.code + ': ' : '') + e.message);
+    }
+    out.textContent = lines.join('\n\n');
+  }
+  const ok = lines.find(l => l.startsWith('✅'));
+  if(ok){
+    const m = ok.slice(2).split(' — ')[0].trim();
+    cfg.model = m; store.set('model', m); $('#fModel').value = m;
+    lines.push('अब यही model इस्तेमाल होगा।');
+    out.textContent = lines.join('\n\n');
+  }
 }
 
 const CHAT_SYS = () =>
@@ -778,6 +815,7 @@ function renderNotes(){
     d.append(del, t, p); w.appendChild(d);
   });
 }
+$('#btnTest').onclick = testApi;
 $('#btnNote').onclick = () => { noteMode = true; status('note बोलो','listen'); listen(); };
 
 /* ============ boot ============ */
