@@ -340,7 +340,7 @@ nav button.on span{filter:none}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.05 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+    <p class="hint" style="margin-top:22px">Voice v1.06 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
   </section>
 </main>
 
@@ -533,7 +533,9 @@ const shortcuts = [
   { re:/(api\s?key|ए पी आई)/i,          url:'https://aistudio.google.com/apikey',    say:'API key page खोल रहा हूँ' }
 ];
 function tryShortcut(text){
-  if(!/(खोल|open|चालू|चला)/i.test(text)) return false;
+  const verb = /(खोल|ओपन|ओपेन|open|चालू|चला|लगा|दिखा|start|launch)/i.test(text);
+  const short = text.trim().split(/\s+/).length <= 4;   // सिर्फ़ "whatsapp" बोला हो
+  if(!verb && !short) return false;
   for(const s of shortcuts){
     if(s.re.test(text)){ addMsg('sys', s.say); speak(s.say); window.open(s.url,'_blank'); return true; }
   }
@@ -624,7 +626,7 @@ async function gemini(userText, systemText, wantJson, useSearch){
   }
 
   if(last && isQuota(last))
-    throw new Error('आज की free limit ख़त्म लग रही है। थोड़ी देर बाद, या Settings में "ताज़ा जानकारी" बंद करके देखो.\n\nGoogle: ' + last.message);
+    throw new Error('quota ख़त्म. अपना usage यहाँ देखो: ai.dev/rate-limit — और AI Studio में नए project की नई key बनाकर देखो.\n\nGoogle: ' + last.message);
   if(last && isBadModel(last))
     throw new Error('कोई model नहीं मिला। Settings में नाम बदलकर देखो.\n\nGoogle: ' + last.message);
   throw new Error('तीनों model ने मना किया.\n\nGoogle: ' + (last ? last.message : 'कोई जानकारी नहीं'));
@@ -706,7 +708,18 @@ async function submit(raw){
       speak(parsed.note || 'code बन गया');
     } else {
       history.push('यूज़र: ' + text);
-      const res = await gemini(history.slice(-6).join('\n'), CHAT_SYS(), false, cfg.search === '1');
+      let res;
+      const useSearch = cfg.search === '1';
+      try{
+        res = await gemini(history.slice(-6).join('\n'), CHAT_SYS(), false, useSearch);
+      }catch(err){
+        // Google Search का quota अलग और छोटा होता है — बिना search एक बार और
+        if(useSearch && /quota|rate limit|resource.?exhausted/i.test(err.message)){
+          addMsg('sys', 'Search का quota ख़त्म — बिना search जवाब दे रहा हूँ।');
+          status('बिना search…','busy');
+          res = await gemini(history.slice(-6).join('\n'), CHAT_SYS(), false, false);
+        } else throw err;
+      }
       history.push('तू: ' + res.text);
       addMsg('ai', res.text, res.sources);
       status('तैयार','ok');
