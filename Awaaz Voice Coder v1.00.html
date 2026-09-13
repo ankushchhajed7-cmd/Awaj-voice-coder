@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Awaaz — बोलो, बन जाएगा</title>
+<meta name="theme-color" content="#14121A">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Awaaz Voice Coder","short_name":"Awaaz","start_url":".","display":"standalone","background_color":"%2314121A","theme_color":"%2314121A","icons":[{"src":"data:image/svg%2Bxml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Crect width=%27192%27 height=%27192%27 rx=%2742%27 fill=%27%237C6BF2%27/%3E%3Ccircle cx=%2796%27 cy=%2778%27 r=%2726%27 fill=%27%23fff%27/%3E%3Crect x=%2788%27 y=%27104%27 width=%2716%27 height=%2734%27 rx=%278%27 fill=%27%23fff%27/%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
+<style>
+:root{
+  --bg:#14121A; --surface:#1D1A26; --surface-2:#262232; --line:#332D45;
+  --ink:#EDE9F5; --ink-dim:#9A92B0; --violet:#7C6BF2; --amber:#E8A33D; --mint:#48D6A8; --red:#F0616F;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex; flex-direction:column; overscroll-behavior:none;
+}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer}
+
+/* ---------- top bar ---------- */
+header{
+  display:flex; align-items:center; gap:10px;
+  padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+  border-bottom:1px solid var(--line); background:var(--surface);
+}
+.brand{font-weight:700;letter-spacing:.5px;font-size:18px}
+.brand em{font-style:normal;color:var(--violet)}
+.status{
+  margin-left:auto; font-size:12px; color:var(--ink-dim);
+  display:flex; align-items:center; gap:6px; max-width:46%; text-align:right;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink-dim);flex:none}
+.dot.listen{background:var(--amber);animation:pulse 1s infinite}
+.dot.busy{background:var(--violet);animation:pulse .7s infinite}
+.dot.ok{background:var(--mint)}
+.dot.err{background:var(--red)}
+@keyframes pulse{50%{opacity:.25}}
+.iconbtn{padding:8px;border-radius:10px;color:var(--ink-dim);font-size:19px}
+.iconbtn:active{background:var(--surface-2)}
+
+/* ---------- panels ---------- */
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.panel{display:none;padding:14px 14px 20px}
+.panel.on{display:block}
+
+.msg{margin:0 0 12px;padding:11px 13px;border-radius:14px;max-width:92%;white-space:pre-wrap;word-break:break-word}
+.msg.me{background:var(--surface-2);margin-left:auto;border-bottom-right-radius:4px}
+.msg.ai{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.sys{background:none;border:1px dashed var(--line);color:var(--ink-dim);font-size:13px;max-width:100%}
+.msg .replay{display:block;margin-top:7px;font-size:12px;color:var(--violet)}
+
+.empty{color:var(--ink-dim);text-align:center;padding:42px 20px;font-size:15px;line-height:1.7}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:8px}
+
+/* ---------- code panel ---------- */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.tab{padding:7px 13px;border-radius:9px;background:var(--surface);border:1px solid var(--line);font-size:13px;font-family:var(--mono);white-space:nowrap;color:var(--ink-dim)}
+.tab.on{background:var(--violet);border-color:var(--violet);color:#fff}
+.editor{
+  width:100%;min-height:44vh;background:#100E16;border:1px solid var(--line);border-radius:12px;
+  padding:12px;font-family:var(--mono);font-size:12.5px;line-height:1.6;resize:vertical;
+  white-space:pre;overflow-wrap:normal;overflow-x:auto;
+}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{padding:10px 15px;border-radius:11px;background:var(--surface-2);border:1px solid var(--line);font-size:14px}
+.btn:active{background:var(--line)}
+.btn.primary{background:var(--violet);border-color:var(--violet);color:#fff;font-weight:600}
+.btn.ghost{background:none}
+
+dialog{
+  border:none;padding:0;background:var(--bg);color:var(--ink);width:100%;height:100%;max-width:100%;max-height:100%;
+}
+dialog::backdrop{background:#000c}
+.preview-head{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+#frame{width:100%;height:calc(100% - 58px);border:0;background:#fff}
+
+/* ---------- notes ---------- */
+.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:10px}
+.note time{display:block;font-size:11px;color:var(--ink-dim);margin-bottom:5px}
+.note button{float:right;color:var(--red);font-size:12px}
+
+/* ---------- settings ---------- */
+label{display:block;font-size:13px;color:var(--ink-dim);margin:14px 0 6px}
+.field{width:100%;padding:11px 12px;background:var(--surface);border:1px solid var(--line);border-radius:11px}
+.hint{font-size:12.5px;color:var(--ink-dim);line-height:1.6;margin-top:8px}
+.hint a{color:var(--violet)}
+
+/* ---------- mic dock ---------- */
+.dock{
+  border-top:1px solid var(--line);background:var(--surface);
+  padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
+  display:flex;align-items:center;gap:10px;
+}
+#say{
+  flex:1;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line);border-radius:22px;
+}
+.mic{
+  width:56px;height:56px;flex:none;border-radius:50%;background:var(--violet);color:#fff;font-size:23px;
+  display:grid;place-items:center;box-shadow:0 4px 16px #7c6bf240;
+}
+.mic.live{background:var(--amber);box-shadow:0 0 0 0 #e8a33d88;animation:ring 1.2s infinite}
+@keyframes ring{70%{box-shadow:0 0 0 16px #e8a33d00}100%{box-shadow:0 0 0 0 #e8a33d00}}
+
+nav{display:flex;border-top:1px solid var(--line);background:var(--surface)}
+nav button{flex:1;padding:11px 0 calc(env(safe-area-inset-bottom) + 11px);font-size:12px;color:var(--ink-dim)}
+nav button span{display:block;font-size:19px;margin-bottom:2px}
+nav button.on{color:var(--violet)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">आवा<em>ज़</em></div>
+  <div class="status"><i class="dot" id="dot"></i><span id="stat">तैयार</span></div>
+  <button class="iconbtn" id="toSettings" title="Settings">⚙</button>
+</header>
+
+<main>
+  <!-- CHAT -->
+  <section class="panel on" id="p-chat">
+    <div class="empty" id="chatEmpty">
+      <b>माइक दबाओ और बोलो</b>
+      कुछ भी पूछो — हिंदी, English या मराठी में।<br>जवाब बोलकर भी मिलेगा।
+    </div>
+    <div id="chatLog"></div>
+  </section>
+
+  <!-- CODE -->
+  <section class="panel" id="p-code">
+    <div class="empty" id="codeEmpty">
+      <b>बोलो कि क्या बनाना है</b>
+      "एक कैलकुलेटर app बनाओ"<br>"दुकान के लिए बिल बनाने वाला page बनाओ"<br>"gold का grid EA बनाओ" — .mq5 भी मिलेगा
+    </div>
+    <div id="codeWrap" style="display:none">
+      <div class="tabs" id="tabs"></div>
+      <textarea class="editor" id="editor" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn primary" id="btnPreview">चलाकर देखो</button>
+        <button class="btn" id="btnCopy">Copy</button>
+        <button class="btn" id="btnDl">Download</button>
+        <button class="btn ghost" id="btnDlAll">सब files</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="btnFix">इसमें बदलाव बोलो</button>
+        <button class="btn ghost" id="btnNew">नया project</button>
+      </div>
+      <p class="hint" id="codeNote"></p>
+    </div>
+  </section>
+
+  <!-- NOTES -->
+  <section class="panel" id="p-notes">
+    <div class="row" style="margin:0 0 12px">
+      <button class="btn" id="btnNote">बोलकर note जोड़ो</button>
+    </div>
+    <div id="noteList"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="panel" id="p-set">
+    <label for="fKey">Gemini API key</label>
+    <input class="field" id="fKey" type="password" placeholder="AIza...">
+    <p class="hint">Free key यहाँ से बनाओ: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — key सिर्फ़ इसी फ़ोन में रहती है, कहीं नहीं जाती।</p>
+
+    <label for="fModel">Model</label>
+    <input class="field" id="fModel" placeholder="gemini-3.8-flash">
+    <p class="hint">काम न करे तो <span style="font-family:var(--mono)">gemini-2.5-flash</span> डाल के देखो।</p>
+
+    <label for="fLang">बोलने की भाषा</label>
+    <select class="field" id="fLang">
+      <option value="hi-IN">हिंदी</option>
+      <option value="en-IN">English</option>
+      <option value="mr-IN">मराठी</option>
+    </select>
+
+    <label for="fSpeak">जवाब बोलकर सुनाना</label>
+    <select class="field" id="fSpeak">
+      <option value="1">हाँ</option>
+      <option value="0">नहीं</option>
+    </select>
+
+    <label>Quick links</label>
+    <div class="row" style="margin-top:0">
+      <button class="btn" data-go="https://github.com/ankushchhajed7-cmd">GitHub</button>
+      <button class="btn" data-go="https://wa.me/">WhatsApp</button>
+      <button class="btn" data-go="https://aistudio.google.com/apikey">API key</button>
+    </div>
+
+    <div class="row" style="margin-top:22px">
+      <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
+    </div>
+    <p class="hint" style="margin-top:22px">Awaaz v1.00 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+  </section>
+</main>
+
+<div class="dock">
+  <input id="say" placeholder="बोलो या यहाँ लिखो…" autocomplete="off">
+  <button class="mic" id="mic" aria-label="बोलो">🎙</button>
+</div>
+
+<nav>
+  <button class="on" data-tab="chat"><span>💬</span>बात</button>
+  <button data-tab="code"><span>⌨</span>Code</button>
+  <button data-tab="notes"><span>📝</span>Notes</button>
+  <button data-tab="set"><span>⚙</span>Settings</button>
+</nav>
+
+<dialog id="dlg">
+  <div class="preview-head">
+    <strong style="flex:1">Preview</strong>
+    <button class="btn" id="btnReload">फिर चलाओ</button>
+    <button class="btn ghost" id="btnClose">बंद</button>
+  </div>
+  <iframe id="frame" sandbox="allow-scripts allow-modals allow-popups"></iframe>
+</dialog>
+
+<script>
+/* ============ storage (localStorage, memory fallback) ============ */
+const mem = {};
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('awaaz:'+k); return v===null ? (k in mem ? mem[k] : d) : JSON.parse(v); }
+             catch(e){ return (k in mem) ? mem[k] : d; } },
+  set(k, v){ mem[k]=v; try{ localStorage.setItem('awaaz:'+k, JSON.stringify(v)); }catch(e){} },
+  wipe(){ for(const k in mem) delete mem[k]; try{ Object.keys(localStorage).filter(k=>k.startsWith('awaaz:')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+};
+
+const $ = s => document.querySelector(s);
+const cfg = {
+  key:   store.get('key',''),
+  model: store.get('model','gemini-3.8-flash'),
+  lang:  store.get('lang','hi-IN'),
+  speak: store.get('speak','1')
+};
+let files = store.get('files', []);      // [{name, code}]
+let active = 0;
+let notes = store.get('notes', []);
+let history = [];                         // chat turns for context
+let pendingFix = false;
+
+/* ============ status ============ */
+function status(text, kind){
+  $('#stat').textContent = text;
+  $('#dot').className = 'dot' + (kind ? ' '+kind : '');
+}
+
+/* ============ tabs ============ */
+document.querySelectorAll('nav button').forEach(b=>{
+  b.onclick = () => showTab(b.dataset.tab);
+});
+function showTab(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  $('#p-'+name).classList.add('on');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  window.scrollTo(0,0);
+}
+$('#toSettings').onclick = () => showTab('set');
+
+/* ============ settings wiring ============ */
+$('#fKey').value = cfg.key; $('#fModel').value = cfg.model;
+$('#fLang').value = cfg.lang; $('#fSpeak').value = cfg.speak;
+$('#fKey').oninput   = e => { cfg.key = e.target.value.trim(); store.set('key', cfg.key); };
+$('#fModel').oninput = e => { cfg.model = e.target.value.trim() || 'gemini-3.8-flash'; store.set('model', cfg.model); };
+$('#fLang').onchange = e => { cfg.lang = e.target.value; store.set('lang', cfg.lang); };
+$('#fSpeak').onchange= e => { cfg.speak = e.target.value; store.set('speak', cfg.speak); };
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => window.open(b.dataset.go,'_blank'));
+$('#btnWipe').onclick = () => { if(confirm('सब कुछ मिट जाएगा — पक्का?')){ store.wipe(); location.reload(); } };
+
+/* ============ speech in ============ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, noteMode = false;
+
+function listen(){
+  if(!SR){ status('mic support नहीं','err'); addMsg('sys','इस browser में voice नहीं चलता। Chrome में खोलो, या नीचे टाइप करके भेजो।'); return; }
+  if(listening){ rec && rec.stop(); return; }
+  rec = new SR();
+  rec.lang = cfg.lang; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec.onstart = () => { listening = true; $('#mic').classList.add('live'); status('सुन रहा हूँ…','listen'); };
+  rec.onresult = e => {
+    let t = '';
+    for(let i=0;i<e.results.length;i++) t += e.results[i][0].transcript;
+    $('#say').value = t;
+    if(e.results[e.results.length-1].isFinal){ rec.stop(); submit(t); }
+  };
+  rec.onerror = e => { status(e.error==='not-allowed' ? 'mic की अनुमति दो' : 'सुनाई नहीं दिया','err'); };
+  rec.onend = () => { listening = false; $('#mic').classList.remove('live'); if($('#dot').className.includes('listen')) status('तैयार'); };
+  try{ rec.start(); }catch(e){ status('फिर से दबाओ','err'); }
+}
+$('#mic').onclick = listen;
+$('#say').addEventListener('keydown', e => { if(e.key==='Enter'){ submit($('#say').value); } });
+
+/* ============ speech out ============ */
+function speak(text){
+  if(cfg.speak !== '1' || !window.speechSynthesis) return;
+  const clean = text.replace(/```[\s\S]*?```/g,' code ').replace(/[*#`_>]/g,'').slice(0,600);
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = cfg.lang; u.rate = 1.02;
+    const v = speechSynthesis.getVoices().find(v => v.lang === cfg.lang) ||
+              speechSynthesis.getVoices().find(v => v.lang.startsWith(cfg.lang.split('-')[0]));
+    if(v) u.voice = v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+if(window.speechSynthesis) speechSynthesis.getVoices();
+
+/* ============ chat log ============ */
+function addMsg(who, text){
+  $('#chatEmpty').style.display = 'none';
+  const d = document.createElement('div');
+  d.className = 'msg ' + who;
+  d.textContent = text;
+  if(who === 'ai'){
+    const b = document.createElement('button');
+    b.className = 'replay'; b.textContent = '🔊 फिर सुनो';
+    b.onclick = () => speak(text);
+    d.appendChild(b);
+  }
+  $('#chatLog').appendChild(d);
+  d.scrollIntoView({block:'end'});
+}
+
+/* ============ local shortcuts (no API needed) ============ */
+const shortcuts = [
+  { re:/(whats\s?app|व्हाट्स|वाट्स)/i,           url:'https://wa.me/',                              say:'WhatsApp खोल रहा हूँ' },
+  { re:/(github|गिटहब|गिट हब)/i,                 url:'https://github.com/ankushchhajed7-cmd',       say:'GitHub खोल रहा हूँ' },
+  { re:/(youtube|यूट्यूब|यू ट्यूब)/i,            url:'https://youtube.com/',                        say:'YouTube खोल रहा हूँ' },
+  { re:/(google\s?maps|नक्शा|मैप)/i,             url:'https://maps.google.com/',                    say:'Maps खोल रहा हूँ' },
+  { re:/(api\s?key|ए पी आई)/i,                   url:'https://aistudio.google.com/apikey',          say:'API key page खोल रहा हूँ' }
+];
+function tryShortcut(text){
+  if(!/(खोल|open|चालू|चला)/i.test(text)) return false;
+  for(const s of shortcuts){
+    if(s.re.test(text)){
+      addMsg('sys', s.say);
+      speak(s.say);
+      window.open(s.url, '_blank');
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ============ is this a build request? ============ */
+function wantsCode(text){
+  return /(बनाओ|बना दो|बनादो|बना देना|code|कोड|app|ऐप|page|पेज|script|website|वेबसाइट|ea|mq5|tool|calculator)/i.test(text);
+}
+
+/* ============ Gemini ============ */
+async function gemini(userText, systemText, wantJson){
+  if(!cfg.key){ throw new Error('पहले Settings में API key डालो'); }
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+              encodeURIComponent(cfg.model) + ':generateContent?key=' + encodeURIComponent(cfg.key);
+  const body = {
+    systemInstruction: { parts: [{ text: systemText }] },
+    contents: [{ role:'user', parts:[{ text: userText }] }]
+  };
+  if(wantJson) body.generationConfig = { responseMimeType: 'application/json' };
+  const r = await fetch(url, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await r.json().catch(() => null);
+  if(!r.ok){
+    const m = data && data.error && data.error.message ? data.error.message : ('HTTP ' + r.status);
+    throw new Error(m);
+  }
+  const c = data && data.candidates && data.candidates[0];
+  if(!c || !c.content || !c.content.parts) throw new Error('खाली जवाब आया — दोबारा बोलो');
+  return c.content.parts.map(p => p.text || '').join('').trim();
+}
+
+const CHAT_SYS =
+  'तू Awaaz है — Ankush का voice assistant. Ankush किराना दुकान चलाता है और फ़ोन से HTML PWA tools और MQL5 EA बनाता है. ' +
+  'जवाब छोटा और सीधा दे, 3-4 लाइन में, क्योंकि जवाब बोलकर सुनाया जाएगा. ' +
+  'यूज़र जिस भाषा में बोले उसी में जवाब दे (Hinglish हो तो Hinglish). कोई markdown, कोई bullet, कोई heading नहीं — सिर्फ़ बोलने लायक साफ़ वाक्य.';
+
+const CODE_SYS =
+  'तू एक expert developer है जो Ankush के लिए code लिखता है. वो सिर्फ़ Android फ़ोन से काम करता है, GitHub web editor से, और GitHub Pages पर deploy करता है. ' +
+  'नियम: (1) पूरा चलने लायक code दे, कोई TODO या "यहाँ अपना code डालो" नहीं. ' +
+  '(2) डिफ़ॉल्ट रूप से single-file HTML बना — CSS और JS उसी index.html के अंदर — जब तक यूज़र अलग files न माँगे. ' +
+  '(3) Mobile-first design, बड़े बटन, dark theme, कोई external CDN नहीं. ' +
+  '(4) MQL5 माँगे तो एक ही .mq5 file दे. ' +
+  '(5) UI का text उसी भाषा में रख जिसमें यूज़र ने माँगा. ' +
+  'जवाब सिर्फ़ इस JSON shape में दे, और कुछ नहीं: ' +
+  '{"note":"एक लाइन में क्या बनाया — यूज़र की भाषा में","files":[{"name":"index.html","code":"<पूरा code>"}]}';
+
+/* ============ submit ============ */
+async function submit(raw){
+  const text = (raw || '').trim();
+  $('#say').value = '';
+  if(!text) return;
+
+  if(noteMode){ noteMode = false; saveNote(text); return; }
+  if(tryShortcut(text)) return;
+
+  const buildMode = pendingFix || wantsCode(text);
+  pendingFix = false;
+
+  if(buildMode){ showTab('code'); } else { showTab('chat'); addMsg('me', text); }
+  status(buildMode ? 'code बना रहा हूँ…' : 'सोच रहा हूँ…', 'busy');
+
+  try{
+    if(buildMode){
+      let prompt = text;
+      if(files.length){
+        prompt = 'अभी का project:\n\n' +
+          files.map(f => '--- ' + f.name + ' ---\n' + f.code).join('\n\n') +
+          '\n\nअब यह बदलाव करो: ' + text + '\n\nपूरी updated files लौटाओ.';
+      }
+      const out = await gemini(prompt, CODE_SYS, true);
+      const parsed = parseFiles(out);
+      files = parsed.files; active = 0;
+      store.set('files', files);
+      renderFiles();
+      $('#codeNote').textContent = parsed.note || '';
+      status('तैयार','ok');
+      speak(parsed.note || 'code बन गया');
+    } else {
+      history.push('यूज़र: ' + text);
+      const ctx = history.slice(-6).join('\n');
+      const out = await gemini(ctx, CHAT_SYS, false);
+      history.push('तू: ' + out);
+      addMsg('ai', out);
+      status('तैयार','ok');
+      speak(out);
+    }
+  }catch(err){
+    status('गड़बड़','err');
+    showTab('chat');
+    addMsg('sys', 'नहीं हो पाया: ' + err.message);
+  }
+}
+
+/* ============ parse model output into files ============ */
+function parseFiles(out){
+  let t = out.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  try{
+    const j = JSON.parse(t);
+    if(j && Array.isArray(j.files) && j.files.length){
+      return { note: j.note || '', files: j.files.filter(f => f && f.name && f.code) };
+    }
+  }catch(e){}
+  // fallback: fenced blocks
+  const blocks = [...out.matchAll(/```([a-z0-9]*)\n([\s\S]*?)```/gi)];
+  if(blocks.length){
+    return { note:'', files: blocks.map((b,i) => ({
+      name: (b[1]==='mql5'||b[1]==='mq5') ? 'project.mq5'
+          : (b[1]==='css') ? 'style.css'
+          : (b[1]==='js'||b[1]==='javascript') ? 'script.js'
+          : (blocks.length===1 ? 'index.html' : 'file'+(i+1)+'.txt'),
+      code: b[2].trim()
+    })) };
+  }
+  return { note:'', files:[{ name:'answer.txt', code: out }] };
+}
+
+/* ============ code panel render ============ */
+function renderFiles(){
+  if(!files.length){ $('#codeWrap').style.display='none'; $('#codeEmpty').style.display=''; return; }
+  $('#codeEmpty').style.display='none'; $('#codeWrap').style.display='';
+  const t = $('#tabs'); t.innerHTML = '';
+  files.forEach((f,i) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (i===active ? ' on' : '');
+    b.textContent = f.name;
+    b.onclick = () => { files[active].code = $('#editor').value; active = i; renderFiles(); };
+    t.appendChild(b);
+  });
+  $('#editor').value = files[active].code;
+}
+$('#editor').oninput = () => { if(files[active]){ files[active].code = $('#editor').value; store.set('files', files); } };
+
+/* ============ preview ============ */
+function buildPreview(){
+  let html = (files.find(f => /\.html?$/i.test(f.name)) || files[0]).code;
+  files.forEach(f => {
+    if(/\.css$/i.test(f.name)){
+      const re = new RegExp('<link[^>]*href=["\\\']\\.?/?' + f.name.replace('.','\\.') + '["\\\'][^>]*>', 'i');
+      html = html.replace(re, '<style>\n' + f.code + '\n</style>');
+    }
+    if(/\.js$/i.test(f.name)){
+      const re = new RegExp('<script[^>]*src=["\\\']\\.?/?' + f.name.replace('.','\\.') + '["\\\'][^>]*><\\/script>', 'i');
+      html = html.replace(re, '<scr' + 'ipt>\n' + f.code + '\n</scr' + 'ipt>');
+    }
+  });
+  return html;
+}
+$('#btnPreview').onclick = () => {
+  const cur = files[active];
+  if(cur && /\.mq5$/i.test(cur.name)){ alert('.mq5 यहाँ नहीं चलेगा — MetaEditor में compile करना पड़ेगा।'); return; }
+  $('#frame').srcdoc = buildPreview();
+  $('#dlg').showModal();
+};
+$('#btnReload').onclick = () => { $('#frame').srcdoc = buildPreview(); };
+$('#btnClose').onclick  = () => { $('#frame').srcdoc = ''; $('#dlg').close(); };
+$('#dlg').addEventListener('close', () => { $('#frame').srcdoc = ''; });
+
+/* ============ copy / download ============ */
+$('#btnCopy').onclick = async () => {
+  try{ await navigator.clipboard.writeText($('#editor').value); status('copy हो गया','ok'); }
+  catch(e){ $('#editor').select(); document.execCommand('copy'); status('copy हो गया','ok'); }
+};
+function download(name, code){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([code], {type:'text/plain'}));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('#btnDl').onclick    = () => download(files[active].name, $('#editor').value);
+$('#btnDlAll').onclick = () => files.forEach((f,i) => setTimeout(() => download(f.name, f.code), i*450));
+$('#btnFix').onclick   = () => { pendingFix = true; status('बोलो क्या बदलना है','listen'); listen(); };
+$('#btnNew').onclick   = () => { if(confirm('ये project हटा दें?')){ files=[]; store.set('files',[]); renderFiles(); $('#codeNote').textContent=''; } };
+
+/* ============ notes ============ */
+function saveNote(text){
+  notes.unshift({ t: Date.now(), text });
+  store.set('notes', notes); renderNotes(); showTab('notes');
+  status('note सेव','ok'); speak('note सेव कर दिया');
+}
+function renderNotes(){
+  const w = $('#noteList');
+  if(!notes.length){ w.innerHTML = '<div class="empty"><b>कोई note नहीं</b>ऊपर वाला बटन दबाकर बोलो — note सेव हो जाएगा।</div>'; return; }
+  w.innerHTML = '';
+  notes.forEach((n, i) => {
+    const d = document.createElement('div'); d.className = 'note';
+    const del = document.createElement('button'); del.textContent = 'हटाओ';
+    del.onclick = () => { notes.splice(i,1); store.set('notes', notes); renderNotes(); };
+    const t = document.createElement('time');
+    t.textContent = new Date(n.t).toLocaleString('hi-IN');
+    const p = document.createElement('div'); p.textContent = n.text;
+    d.append(del, t, p); w.appendChild(d);
+  });
+}
+$('#btnNote').onclick = () => { noteMode = true; status('note बोलो','listen'); listen(); };
+
+/* ============ boot ============ */
+renderFiles(); renderNotes();
+if(!cfg.key){ showTab('set'); status('API key डालो','err'); }
+</script>
+</body>
+</html>
