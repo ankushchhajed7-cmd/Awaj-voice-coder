@@ -340,7 +340,7 @@ nav button.on span{filter:none}
     <div class="row" style="margin-top:22px">
       <button class="btn ghost" id="btnWipe" style="color:var(--red)">सब data मिटाओ</button>
     </div>
-    <p class="hint" style="margin-top:22px">Voice v1.06 · ANKUSH NEW VISION<br>बोलकर कहो "whatsapp खोलो", "github खोलो" — सीधे खुल जाएगा।</p>
+    <p class="hint" style="margin-top:22px">Voice v1.07 · ANKUSH NEW VISION<br>बोलकर खोलो: WhatsApp, Facebook, Instagram, YouTube, Gmail, Maps, Telegram, Play Store, GitHub, Google, Dialer.</p>
   </section>
 </main>
 
@@ -524,20 +524,54 @@ function addMsg(who, text, sources){
   d.scrollIntoView({block:'end'});
 }
 
-/* ============ shortcuts ============ */
-const shortcuts = [
-  { re:/(whats\s?app|व्हाट्स|वाट्स)/i,  url:'https://wa.me/',                        say:'WhatsApp खोल रहा हूँ' },
-  { re:/(github|गिटहब|गिट हब)/i,        url:'https://github.com/ankushchhajed7-cmd', say:'GitHub खोल रहा हूँ' },
-  { re:/(youtube|यूट्यूब|यू ट्यूब)/i,   url:'https://youtube.com/',                  say:'YouTube खोल रहा हूँ' },
-  { re:/(google\s?maps|नक्शा|मैप)/i,    url:'https://maps.google.com/',              say:'Maps खोल रहा हूँ' },
-  { re:/(api\s?key|ए पी आई)/i,          url:'https://aistudio.google.com/apikey',    say:'API key page खोल रहा हूँ' }
+/* ============ shortcuts — बिना API के ============ */
+function intentUrl(pkg, host, fallback){
+  return 'intent://' + host + '#Intent;scheme=https;package=' + pkg +
+         ';S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
+}
+function schemeIntent(pkg, scheme, path, fallback){
+  return 'intent://' + path + '#Intent;scheme=' + scheme + ';package=' + pkg +
+         ';S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
+}
+
+const APPS = [
+  { re:/(whats\s?app|व्हाट्स|वाट्स|वॉट्स)/i, say:'WhatsApp खोल रहा हूँ',
+    url: schemeIntent('com.whatsapp','whatsapp','send','https://web.whatsapp.com/') },
+  { re:/(facebook|फेस\s?बुक|एफ\s?बी)/i, say:'Facebook खोल रहा हूँ',
+    url: intentUrl('com.facebook.katana','m.facebook.com/','https://facebook.com/') },
+  { re:/(instagram|इंस्टा|इन्स्टा)/i, say:'Instagram खोल रहा हूँ',
+    url: intentUrl('com.instagram.android','instagram.com/','https://instagram.com/') },
+  { re:/(youtube|यूट्यूब|यू\s?ट्यूब)/i, say:'YouTube खोल रहा हूँ',
+    url: intentUrl('com.google.android.youtube','m.youtube.com/','https://youtube.com/') },
+  { re:/(g\s?mail|जीमेल|जी\s?मेल|ईमेल|email)/i, say:'Gmail खोल रहा हूँ',
+    url: intentUrl('com.google.android.gm','mail.google.com/','https://mail.google.com/') },
+  { re:/(maps|नक्शा|मैप|नक़्शा)/i, say:'Maps खोल रहा हूँ',
+    url: intentUrl('com.google.android.apps.maps','maps.google.com/','https://maps.google.com/') },
+  { re:/(play\s?store|प्ले\s?स्टोर)/i, say:'Play Store खोल रहा हूँ',
+    url: schemeIntent('com.android.vending','market','search?q=apps','https://play.google.com/store') },
+  { re:/(telegram|टेलीग्राम)/i, say:'Telegram खोल रहा हूँ',
+    url: intentUrl('org.telegram.messenger','t.me/','https://web.telegram.org/') },
+  { re:/(github|गिटहब|गिट\s?हब)/i, say:'GitHub खोल रहा हूँ',
+    url:'https://github.com/ankushchhajed7-cmd' },
+  { re:/(api\s?key|ए\s?पी\s?आई)/i, say:'API key page खोल रहा हूँ',
+    url:'https://aistudio.google.com/apikey' },
+  { re:/(फ़ोन|फोन|डायलर|dial|call)/i, say:'Dialer खोल रहा हूँ', url:'tel:' },
+  { re:/(google|गूगल)/i, say:'Google खोल रहा हूँ', url:'https://www.google.com/' }
 ];
+
 function tryShortcut(text){
-  const verb = /(खोल|ओपन|ओपेन|open|चालू|चला|लगा|दिखा|start|launch)/i.test(text);
-  const short = text.trim().split(/\s+/).length <= 4;   // सिर्फ़ "whatsapp" बोला हो
+  const verb  = /(खोल|ओपन|ओपेन|open|चालू|चला|लगा|दिखा|start|launch)/i.test(text);
+  const short = text.trim().split(/\s+/).length <= 3;
   if(!verb && !short) return false;
-  for(const s of shortcuts){
-    if(s.re.test(text)){ addMsg('sys', s.say); speak(s.say); window.open(s.url,'_blank'); return true; }
+
+  for(const a of APPS){
+    if(a.re.test(text)){
+      addMsg('sys', a.say);
+      speak(a.say);
+      if(a.url.startsWith('intent://') || a.url.startsWith('tel:')) window.location.href = a.url;
+      else window.open(a.url, '_blank');
+      return true;
+    }
   }
   return false;
 }
